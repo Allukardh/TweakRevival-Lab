@@ -50,9 +50,10 @@ jobs:
           if-no-files-found: error
   prerelease:
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || (github.ref == 'refs/heads/main' && github.event.head_commit.message == 'release: publish SnapVela alpha')
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           pattern: SnapVela-*
@@ -67,11 +68,19 @@ jobs:
           for f in dist/*.deb; do
             test "$(dpkg-deb -f "$f" Package)" = "com.allukardh.snapvela"
           done
+          test "$(dpkg-deb -f dist/SnapVela-rootless.deb Architecture)" = "iphoneos-arm64"
+          test "$(dpkg-deb -f dist/SnapVela-roothide.deb Architecture)" = "iphoneos-arm64e"
       - name: Publish experimental prerelease
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${{ github.ref_name }}" dist/*.deb \
-            --repo "${{ github.repository }}" \
-            --title "SnapVela ${{ github.ref_name }} - experimental" \
-            --prerelease --generate-notes
+          set -euo pipefail
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            release_tag="$GITHUB_REF_NAME"
+          else
+            release_tag="v0.1.0-alpha.1"
+          fi
+          gh release create "$release_tag" dist/*.deb \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "SnapVela $release_tag (EXPERIMENTAL)" \
+            --notes-file tweaks/SnapVela/RELEASE_NOTES.md --prerelease
