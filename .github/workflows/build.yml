@@ -1,0 +1,75 @@
+name: SnapVela dual-build
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        scheme: [rootless, roothide]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain dependencies
+        run: |
+          brew install make dpkg ldid fakeroot
+          echo "$(brew --prefix make)/libexec/gnubin" >> "$GITHUB_PATH"
+      - name: Prepare Theos
+        run: |
+          set -euo pipefail
+          export THEOS="$RUNNER_TEMP/theos"
+          git clone --recursive --depth=1 https://github.com/roothide/theos.git "$THEOS"
+          git clone --depth=1 https://github.com/theos/sdks.git "$THEOS/sdks"
+          echo "THEOS=$THEOS" >> "$GITHUB_ENV"
+      - name: Compile package
+        working-directory: tweaks/SnapVela
+        run: |
+          set -euo pipefail
+          make clean package THEOS_PACKAGE_SCHEME=${{ matrix.scheme }} FINALPACKAGE=1
+          test "$(find packages -type f -name '*.deb' | wc -l | tr -d ' ')" -eq 1
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          cp packages/*.deb "$GITHUB_WORKSPACE/out/SnapVela-${{ matrix.scheme }}.deb"
+      - name: Validate .deb
+        run: |
+          set -euo pipefail
+          test "$(dpkg-deb -f out/SnapVela-${{ matrix.scheme }}.deb Package)" = "com.allukardh.snapvela"
+          dpkg-deb -c out/SnapVela-${{ matrix.scheme }}.deb | grep -q SnapVela.dylib
+          dpkg-deb -c out/SnapVela-${{ matrix.scheme }}.deb | grep -q SnapVela.plist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SnapVela-${{ matrix.scheme }}
+          path: out/*.deb
+          if-no-files-found: error
+  prerelease:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: SnapVela-*
+          path: dist
+          merge-multiple: true
+      - name: Assert both variant packages
+        run: |
+          set -euo pipefail
+          test "$(find dist -name '*.deb' | wc -l)" -eq 2
+          test -f dist/SnapVela-rootless.deb
+          test -f dist/SnapVela-roothide.deb
+          for f in dist/*.deb; do
+            test "$(dpkg-deb -f "$f" Package)" = "com.allukardh.snapvela"
+          done
+      - name: Publish experimental prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" dist/*.deb \
+            --repo "${{ github.repository }}" \
+            --title "SnapVela ${{ github.ref_name }} - experimental" \
+            --prerelease --generate-notes

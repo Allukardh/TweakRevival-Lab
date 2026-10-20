@@ -1,0 +1,9 @@
+Package: com.allukardh.snapvela
+Name: SnapVela (Experimental)
+Version: 0.1.0~alpha1
+Architecture: iphoneos-arm64
+Depends: mobilesubstrate
+Maintainer: TweakRevival-Lab contributors
+Author: TweakRevival-Lab contributors
+Section: Tweaks
+Description: Experimental Photos-only confirmation and zoom tweak, inactive by default.
