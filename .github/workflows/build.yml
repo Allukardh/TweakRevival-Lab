@@ -40,8 +40,9 @@ jobs:
         run: |
           set -euo pipefail
           test "$(dpkg-deb -f out/SnapVela-${{ matrix.scheme }}.deb Package)" = "com.allukardh.snapvela"
-          dpkg-deb -c out/SnapVela-${{ matrix.scheme }}.deb | grep -q SnapVela.dylib
-          dpkg-deb -c out/SnapVela-${{ matrix.scheme }}.deb | grep -q SnapVela.plist
+          dpkg-deb -c out/SnapVela-${{ matrix.scheme }}.deb > "$RUNNER_TEMP/snapvela-filelist.txt"
+          grep -q SnapVela.dylib "$RUNNER_TEMP/snapvela-filelist.txt"
+          grep -q SnapVela.plist "$RUNNER_TEMP/snapvela-filelist.txt"
       - uses: actions/upload-artifact@v4
         with:
           name: SnapVela-${{ matrix.scheme }}
