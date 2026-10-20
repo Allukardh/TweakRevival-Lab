@@ -25,6 +25,7 @@ jobs:
           set -euo pipefail
           export THEOS="$RUNNER_TEMP/theos"
           git clone --recursive --depth=1 https://github.com/roothide/theos.git "$THEOS"
+          rm -rf "$THEOS/sdks"
           git clone --depth=1 https://github.com/theos/sdks.git "$THEOS/sdks"
           echo "THEOS=$THEOS" >> "$GITHUB_ENV"
       - name: Compile package
